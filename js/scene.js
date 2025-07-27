@@ -19,17 +19,16 @@ const clock = new THREE.Clock();
 const objectsToUpdate = [];
 let defaultMaterial, projectileMaterial;
 
-// Variável de estado para o toggle de mira
 let isAiming = false;
-let isOrbiting = false; // Nova variável de estado para OrbitControls ativado pelo mouse
-let lastFreeCameraPosition = new THREE.Vector3(); // Armazena a última posição da câmera livre
-let lastFreeCameraQuaternion = new THREE.Quaternion(); // Armazena a última rotação da câmera livre
+let isOrbiting = false;
+let lastFreeCameraPosition = new THREE.Vector3();
+let lastFreeCameraQuaternion = new THREE.Quaternion();
 
 const keysPressed = {
   KeyW: false,
   KeyA: false,
   KeyS: false,
-  KeyD: false, // Movimento (WASD)
+  KeyD: false,
 };
 
 // --- ESTADO DO JOGO E DOM ---
@@ -38,6 +37,7 @@ let gameState = {
   targets: 0,
   projectiles: 100,
   isGameOver: false,
+  waitingForLevelEnd: false, // Controla a transição de nível limpa
 };
 const targetMaterial = new THREE.MeshStandardMaterial({
   color: 0xffd700,
@@ -47,14 +47,12 @@ const targetMaterial = new THREE.MeshStandardMaterial({
 });
 const targetsDisplay = document.getElementById("targets-display"),
   projectilesDisplay = document.getElementById("projectiles-display"),
-  crosshair = document.getElementById("crosshair"), // O crosshair HTML será escondido ou reusado como ponto de mira 3D
+  crosshair = document.getElementById("crosshair"),
   uiContainer = document.getElementById("ui-container"),
-  toggleUiButton = document.getElementById("toggle-ui-button"); // Novo botão
+  toggleUiButton = document.getElementById("toggle-ui-button");
 
-// Mira 3D baseada na trajetória
 let dynamicAimMesh;
 
-// Elementos da UI
 const uiElements = {
   azimuthInput: document.getElementById("azimuth"),
   elevationInput: document.getElementById("elevation"),
@@ -67,7 +65,8 @@ const uiElements = {
   statusDisplay: document.getElementById("status"),
 };
 
-// --- ASSET MANAGER E PARTICLE SYSTEM ---
+// ... O restante do código (Asset Manager, Particle System, Init, Setups) permanece o mesmo ...
+// (Para evitar um bloco de código gigante, o início do arquivo que não foi alterado foi omitido)
 const assetManager = {
   models: {},
   async load() {
@@ -177,21 +176,17 @@ class ParticleSystem {
     }
   }
 }
-
-// --- INICIALIZAÇÃO GERAL ---
 async function init() {
   await assetManager.load();
   scene = new THREE.Scene();
   physicsWorld = new CANNON.World({ gravity: new CANNON.Vec3(0, -9.82, 0) });
   particleSystem = new ParticleSystem(scene);
-
   setupPhysicsMaterials();
   setupCamera();
   setupRenderer();
   setupSkyboxAndFog();
   setupLighting();
   setupPostProcessing();
-
   createWorld(
     scene,
     physicsWorld,
@@ -205,23 +200,18 @@ async function init() {
     defaultMaterial,
     projectileMaterial
   );
-
   gameCannon.setUIElements(uiElements);
-
   setupControls();
-
   loadLevel(0);
   animate();
 }
-
-// --- SETUP ---
 function setupPhysicsMaterials() {
   defaultMaterial = new CANNON.Material("default");
   projectileMaterial = new CANNON.Material("projectile");
   physicsWorld.addContactMaterial(
     new CANNON.ContactMaterial(defaultMaterial, projectileMaterial, {
-      friction: 0.3,
-      restitution: 0.6,
+      friction: 0.5,
+      restitution: 0.2,
     })
   );
 }
@@ -232,21 +222,10 @@ function setupCamera() {
     0.2,
     5000
   );
-  // Posição inicial ajustada para uma visão de terceira pessoa mais ampla
   camera.position.set(0, 15, 30);
   camera.lookAt(0, 5, 10);
-
-  // Armazena a posição inicial da câmera como a "última posição livre"
   lastFreeCameraPosition.copy(camera.position);
   lastFreeCameraQuaternion.copy(camera.quaternion);
-
-  // Removendo a retícula fixa da câmera (agora usaremos a mira 3D)
-  // const reticle = new THREE.Mesh(
-  //   new THREE.CircleGeometry(0.1, 16),
-  //   new THREE.MeshBasicMaterial({ color: 0xffff00 })
-  // );
-  // camera.add(reticle);
-  // reticle.position.set(0, 0, -5);
 }
 function setupRenderer() {
   renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -296,27 +275,22 @@ function setupPostProcessing() {
   );
   composer.addPass(bloomPass);
 }
-
 function setupControls() {
   controls = new OrbitControls(camera, renderer.domElement);
   controls.enableDamping = true;
   controls.dampingFactor = 0.05;
-  controls.target.copy(gameCannon.getCannonPositionForCamera()); // Target inicial no canhão
-  controls.enabled = false; // Começa DESABILITADO
-  controls.enableRotate = true; // permite girar com LMB
-  controls.enablePan = true; // permite arrastar com LMB (panorâmica)
+  controls.target.copy(gameCannon.getCannonPositionForCamera());
+  controls.enabled = false;
+  controls.enableRotate = true;
+  controls.enablePan = true;
   controls.enableZoom = true;
-
-  // Criar o mesh da mira dinâmica
   dynamicAimMesh = new THREE.Mesh(
     new THREE.CircleGeometry(0.2, 32),
     new THREE.MeshBasicMaterial({ color: 0xff0000, side: THREE.DoubleSide })
   );
-  dynamicAimMesh.rotation.x = -Math.PI / 2; // Para que o círculo fique deitado no chão
-  dynamicAimMesh.visible = false; // Começa invisível
+  dynamicAimMesh.rotation.x = -Math.PI / 2;
+  dynamicAimMesh.visible = false;
   scene.add(dynamicAimMesh);
-
-  // Botão para ocultar/mostrar a UI
   document.getElementById("toggle-ui-button").addEventListener("click", () => {
     const uiContainer = document.getElementById("ui-container");
     if (uiContainer.style.display === "none") {
@@ -327,23 +301,16 @@ function setupControls() {
       document.getElementById("toggle-ui-button").textContent = "Mostrar UI";
     }
   });
-
   window.addEventListener("keydown", (e) => {
-    // Teclas de Movimento do Canhão (WASD) - APENAS MOVIMENTO DA BASE
     if (e.code === "KeyW") keysPressed.KeyW = true;
     if (e.code === "KeyA") keysPressed.KeyA = true;
     if (e.code === "KeyS") keysPressed.KeyS = true;
     if (e.code === "KeyD") keysPressed.KeyD = true;
-
     if (e.code === "KeyR") loadLevel(gameState.currentLevel);
-
-    // Setas do teclado controlando a mira (AGORA APENAS DENTRO DO MODO DE MIRA E NÃO ORBITANDO)
     if (isAiming && !isOrbiting) {
       gameCannon.handleKeyboardAiming(e.code);
     }
-
     if (e.code === "Space") {
-      // Disparar APENAS com a barra de espaço
       if (gameState.projectiles > 0 && !gameState.isGameOver) {
         shoot();
       } else {
@@ -352,94 +319,69 @@ function setupControls() {
       }
     }
   });
-
   window.addEventListener("keyup", (e) => {
-    // Teclas de Movimento do Canhão (WASD)
     if (e.code === "KeyW") keysPressed.KeyW = false;
     if (e.code === "KeyA") keysPressed.KeyA = false;
     if (e.code === "KeyS") keysPressed.KeyS = false;
     if (e.code === "KeyD") keysPressed.KeyD = false;
   });
-
-  // MOUSE DOWN
   renderer.domElement.addEventListener("mousedown", (e) => {
     if (e.button === 2) {
-      // Botão direito: toggle mira
       isAiming = !isAiming;
       if (isAiming) {
-        // Se entrar no modo de mira
-        lastFreeCameraPosition.copy(camera.position); // Salva a posição atual da câmera
-        lastFreeCameraQuaternion.copy(camera.quaternion); // Salva a rotação atual da câmera
-        controls.enabled = false; // Desabilita OrbitControls para mirar
+        lastFreeCameraPosition.copy(camera.position);
+        lastFreeCameraQuaternion.copy(camera.quaternion);
+        controls.enabled = false;
         renderer.domElement.requestPointerLock();
-        crosshair.style.display = "block"; // Crosshair HTML (ainda podemos usá-lo ou substituí-lo completamente pelo 3D)
-        dynamicAimMesh.visible = true; // Mostra a mira 3D
+        crosshair.style.display = "block";
+        dynamicAimMesh.visible = true;
         gameCannon.enableAimingMode();
       } else {
-        // Se sair do modo de mira
-        document.exitPointerLock(); // Libera Pointer Lock (acionará pointerlockchange)
+        document.exitPointerLock();
       }
     } else if (e.button === 0) {
-      // Botão esquerdo: ativa OrbitControls
       if (!isAiming) {
-        // Só ativa se não estiver no modo de mira
         isOrbiting = true;
         controls.enabled = true;
-        controls.target.copy(gameCannon.getCannonPositionForCamera()); // Garante que o target seja o canhão
+        controls.target.copy(gameCannon.getCannonPositionForCamera());
       }
     }
   });
-
-  // MOUSE UP
   renderer.domElement.addEventListener("mouseup", (e) => {
     if (e.button === 0) {
-      // Botão esquerdo: desativa OrbitControls
       if (isOrbiting) {
-        // Apenas se estava orbitando
         isOrbiting = false;
-        controls.enabled = false; // Desabilita controles
-        // Salva a última posição e rotação da câmera livre
+        controls.enabled = false;
         lastFreeCameraPosition.copy(camera.position);
         lastFreeCameraQuaternion.copy(camera.quaternion);
       }
     }
   });
-
-  // Quando o Pointer Lock for perdido (por ESC ou externa)
   document.addEventListener("pointerlockchange", () => {
     if (document.pointerLockElement !== renderer.domElement) {
       if (isAiming) {
-        // Se Pointer Lock foi liberado E estávamos em aiming
         isAiming = false;
-        crosshair.style.display = "none"; // Esconde crosshair HTML
-        dynamicAimMesh.visible = false; // Esconde a mira 3D
+        crosshair.style.display = "none";
+        dynamicAimMesh.visible = false;
         gameCannon.disableAimingMode();
       }
-      // Se não estivermos mais em modo de mira (Pointer Lock), garantimos que OrbitControls esteja desativado
-      // para que a câmera volte ao modo padrão.
       controls.enabled = false;
-      isOrbiting = false; // Garante que o estado de órbita seja resetado
+      isOrbiting = false;
     }
   });
-
-  // MOUSE MOVE - AGORA SÓ AFETA A MIRA SE isAiming FOR TRUE E NÃO ESTIVER ORBITANDO
   window.addEventListener("mousemove", (e) => {
     if (isAiming && !isOrbiting) {
       gameCannon.handleAimingMouseMove(e);
     }
   });
-
-  // Roda do mouse para controle de força
   window.addEventListener(
     "wheel",
     (e) => {
-      e.preventDefault(); // Impede o scroll da página
+      e.preventDefault();
       gameCannon.handlePowerScroll(e.deltaY);
     },
     { passive: false }
-  ); // Usar { passive: false } para permitir preventDefault
-
-  // Previne o menu de contexto do botão direito
+  );
   renderer.domElement.addEventListener("contextmenu", (e) =>
     e.preventDefault()
   );
@@ -464,13 +406,14 @@ function createTarget(position) {
     material: defaultMaterial,
   });
   body.isTarget = true;
-  body.gameReference = { toRemove: false, meshRef: model }; // Adiciona referência ao mesh
+  body.gameReference = { toRemove: false, meshRef: model };
   model.bodyRef = body;
   scene.add(model);
   physicsWorld.addBody(body);
   objectsToUpdate.push(model);
   gameState.targets++;
 }
+
 const levels = [
   {
     name: "Nível 1",
@@ -481,7 +424,18 @@ const levels = [
       createTarget(new THREE.Vector3(-15, 8, -10));
     },
   },
+  {
+    name: "Nível 2",
+    projectiles: 15,
+    setup: () => {
+      createTarget(new THREE.Vector3(-25, 12, -20));
+      createTarget(new THREE.Vector3(0, 15, -40));
+      createTarget(new THREE.Vector3(25, 12, -20));
+      createTarget(new THREE.Vector3(10, 5, -50));
+    },
+  },
 ];
+
 function shoot() {
   const projectileMesh = gameCannon.shoot();
   if (projectileMesh) {
@@ -490,16 +444,17 @@ function shoot() {
     uiElements.statusDisplay.textContent = `Disparado! Velocidade: ${parseFloat(
       uiElements.powerInput.value
     ).toFixed(1)} m/s`;
+
+    projectileMesh.bodyRef.isProjectile = true;
     projectileMesh.bodyRef.gameReference = {
       toRemove: false,
       createdAt: clock.getElapsedTime(),
     };
     projectileMesh.bodyRef.addEventListener("collide", onProjectileHit);
     objectsToUpdate.push(projectileMesh);
-  } else {
-    console.warn("gameCannon.shoot() não retornou um mesh válido.");
   }
 }
+
 function loadLevel(levelIndex) {
   clearLevel();
   const level = levels[levelIndex];
@@ -507,53 +462,81 @@ function loadLevel(levelIndex) {
   gameState.currentLevel = levelIndex;
   gameState.projectiles = level.projectiles;
   gameState.isGameOver = false;
+  gameState.waitingForLevelEnd = false; // Reseta a flag de espera
+
   level.setup();
   updateGameUI();
-  uiElements.statusDisplay.textContent = "Preparado para disparar";
+  uiElements.statusDisplay.textContent = `Nível ${levelIndex + 1} - Preparado`;
 }
+
 function clearLevel() {
   gameState.targets = 0;
   for (let i = objectsToUpdate.length - 1; i >= 0; i--) {
     const obj = objectsToUpdate[i];
-    if (obj.bodyRef) physicsWorld.removeBody(obj.bodyRef);
-    scene.remove(obj);
+    if (obj.bodyRef) {
+      if (physicsWorld.bodies.includes(obj.bodyRef)) {
+        physicsWorld.removeBody(obj.bodyRef);
+      }
+    }
+    if (scene.children.includes(obj)) {
+      scene.remove(obj);
+    }
   }
   objectsToUpdate.length = 0;
 }
+
+// ✅ ALTERAÇÃO: Função onProjectileHit totalmente corrigida e robusta.
 function onProjectileHit(event) {
-  const hitTarget = (body) => {
-    // Verifica se o corpo colidido é um alvo e ainda não foi marcado para remoção
-    if (body?.isTarget && !body.gameReference.toRemove) {
-      body.gameReference.toRemove = true; // Marca para remover
-      gameState.targets--;
-      console.log("Alvo atingido! Alvos restantes:", gameState.targets); // Depuração
-      updateGameUI();
-      particleSystem.explode(body.position);
+  const bodyA = event.bodyA;
+  const bodyB = event.bodyB;
 
-      // Remove o mesh visual do alvo da cena
-      if (body.gameReference.meshRef) {
-        scene.remove(body.gameReference.meshRef);
-      }
-      // Remove o corpo físico do alvo do mundo para evitar mais colisões
-      physicsWorld.removeBody(body);
+  // Descobre qual dos corpos que colidiram é o alvo.
+  let targetBody = null;
+  if (bodyA?.isTarget) {
+    targetBody = bodyA;
+  } else if (bodyB?.isTarget) {
+    targetBody = bodyB;
+  }
 
-      // Verifica condição de vitória
-      if (gameState.targets <= 0) {
-        // Usar <= 0 para garantir que passe mesmo se algo inesperado ocorrer
-        checkWinCondition();
-      }
+  // Se um alvo foi atingido E ele ainda não foi marcado para remoção...
+  if (targetBody && !targetBody.gameReference.toRemove) {
+    // Marca o alvo para ser removido no loop 'animate'
+    targetBody.gameReference.toRemove = true;
+
+    // Atualiza a contagem e a UI
+    gameState.targets--;
+    updateGameUI();
+
+    // Efeito visual
+    particleSystem.explode(targetBody.position);
+
+    // Se este foi o último alvo, inicia o processo de fim de nível.
+    if (gameState.targets <= 0) {
+      gameState.waitingForLevelEnd = true;
+      uiElements.statusDisplay.textContent =
+        "Alvos destruídos! Finalizando nível...";
     }
-  };
-  hitTarget(event.bodyA);
-  hitTarget(event.bodyB);
+  }
 }
+
 function checkWinCondition() {
   if (gameState.isGameOver) return;
-  gameState.isGameOver = true;
-  uiElements.statusDisplay.textContent =
-    "Nível Concluído! (Pressione R para reiniciar)";
-  alert("Nível Concluído! (Pressione R para reiniciar)");
+  const nextLevelIndex = gameState.currentLevel + 1;
+  if (levels[nextLevelIndex]) {
+    uiElements.statusDisplay.textContent = `Nível ${
+      gameState.currentLevel + 1
+    } Concluído! Carregando...`;
+    setTimeout(() => {
+      loadLevel(nextLevelIndex);
+    }, 2000);
+  } else {
+    gameState.isGameOver = true;
+    uiElements.statusDisplay.textContent =
+      "Você venceu o jogo! (Pressione R para reiniciar)";
+    alert("Parabéns, você completou todos os níveis!");
+  }
 }
+
 function onWindowResize() {
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
@@ -564,26 +547,18 @@ function updateGameUI() {
   targetsDisplay.textContent = gameState.targets;
   projectilesDisplay.textContent = gameState.projectiles;
 }
-
-// Movimento WASD do canhão relativo à sua orientação
 function handleCannonMovement(deltaTime) {
-  const speed = 20; // Velocidade de movimento AUMENTADA
+  const speed = 20;
   let vx = 0,
     vz = 0;
-
-  // Obtém a direção "para frente" da base do canhão (vetor Three.js)
-  // O eixo Z negativo local do canhão aponta para onde o cano aponta.
   const forwardDirection = new THREE.Vector3(0, 0, -1)
     .applyQuaternion(gameCannon.basePivot.quaternion)
     .normalize();
-  forwardDirection.y = 0; // Movimento no plano XZ
+  forwardDirection.y = 0;
   forwardDirection.normalize();
-
-  // Calcula a direção "para a direita" (90 graus à direita da frente)
   const rightDirection = new THREE.Vector3()
     .crossVectors(new THREE.Vector3(0, 1, 0), forwardDirection)
     .normalize();
-
   if (keysPressed.KeyW) {
     vx += forwardDirection.x * speed;
     vz += forwardDirection.z * speed;
@@ -600,8 +575,6 @@ function handleCannonMovement(deltaTime) {
     vx += rightDirection.x * speed;
     vz += rightDirection.z * speed;
   }
-
-  // Aplica a velocidade ao corpo físico do canhão
   gameCannon.cannonBody.velocity.x = vx;
   gameCannon.cannonBody.velocity.z = vz;
 }
@@ -610,72 +583,55 @@ function animate() {
   requestAnimationFrame(animate);
   const dt = Math.min(0.1, clock.getDelta());
 
-  handleCannonMovement(dt); // Movimento da BASE do canhão (corpo) com WASD
-  gameCannon.update(dt); // Sincroniza visual com física (posição e rotação da base e rodas)
+  handleCannonMovement(dt);
+  gameCannon.update(dt);
   physicsWorld.step(1 / 60, dt, 3);
   particleSystem.update(dt);
 
-  // Lógica da Câmera:
+  // Lógica de câmera...
   if (isAiming) {
-    // Modo de Mira (Pointer Lock): Câmera segue a mira do canhão
     const { mouthPos, shootDir } = gameCannon.getCameraAimPointAndDirection();
-
-    const cameraDistanceBehind = 10;
-    const cameraHeightOffset = 5;
-
+    const cameraDistanceBehind = 10,
+      cameraHeightOffset = 5;
     const camTargetPos = mouthPos
       .clone()
       .add(shootDir.clone().negate().multiplyScalar(cameraDistanceBehind))
       .add(new THREE.Vector3(0, cameraHeightOffset, 0));
-
-    camera.position.lerp(camTargetPos, 0.1); // Suaviza o movimento da câmera
+    camera.position.lerp(camTargetPos, 0.1);
     camera.lookAt(mouthPos.clone().add(shootDir.clone().multiplyScalar(20)));
-    crosshair.style.display = "none"; // Oculta o crosshair HTML
-
-    // Posiciona a mira 3D no ponto final da trajetória
+    crosshair.style.display = "none";
     const aimPoint = gameCannon.getAimPointFromTrajectory();
     if (aimPoint) {
       dynamicAimMesh.position.copy(aimPoint);
-      dynamicAimMesh.position.y += 0.1; // Levemente acima do chão para não ficar dentro do terreno
-      dynamicAimMesh.visible = true; // Mostra a mira 3D
+      dynamicAimMesh.position.y += 0.1;
+      dynamicAimMesh.visible = true;
     } else {
       dynamicAimMesh.visible = false;
     }
   } else if (isOrbiting) {
-    // Modo de Câmera Livre (OrbitControls ativo):
-    controls.update(); // Permite que OrbitControls funcione livremente
-    crosshair.style.display = "none"; // Esconde a mira HTML
-    dynamicAimMesh.visible = false; // Esconde a mira 3D
-    // A posição e rotação da câmera já são atualizadas pelo OrbitControls
-    // e serão salvas em lastFreeCameraPosition/Quaternion no mouseup.
+    controls.update();
+    crosshair.style.display = "none";
+    dynamicAimMesh.visible = false;
   } else {
-    // Modo de Câmera Padrão (nem mira, nem órbita ativa): Câmera na última posição livre.
-    // Interpolar para a última posição e rotação livre
     camera.position.lerp(lastFreeCameraPosition, 0.05);
     camera.quaternion.slerp(lastFreeCameraQuaternion, 0.05);
-
-    // Atualiza o target do OrbitControls para onde a câmera está olhando para evitar saltos ao reativá-lo
     controls.target.copy(gameCannon.getCannonPositionForCamera());
     controls.update();
-
-    crosshair.style.display = "none"; // Esconde a mira HTML
-    dynamicAimMesh.visible = false; // Esconde a mira 3D
+    crosshair.style.display = "none";
+    dynamicAimMesh.visible = false;
   }
 
-  // LINHA AMARELA SEMPRE VISÍVEL E ATUALIZADA (só se estiver em modo de mira, a lógica está dentro de updateTrajectoryPrediction)
   gameCannon.updateTrajectoryPrediction();
 
+  // Lógica de atualização dos objetos (marcar e remover)...
   for (let i = objectsToUpdate.length - 1; i >= 0; i--) {
     const obj = objectsToUpdate[i];
     if (obj.bodyRef) {
-      // Atualiza a posição e rotação dos objetos baseadas no corpo físico,
-      // se eles ainda não estiverem marcados para remoção.
       if (!obj.bodyRef.gameReference.toRemove) {
         obj.position.copy(obj.bodyRef.position);
         obj.quaternion.copy(obj.bodyRef.quaternion);
       }
 
-      // Lógica de remoção para projéteis (tempo de vida)
       if (
         obj.bodyRef.isProjectile &&
         clock.getElapsedTime() - obj.bodyRef.gameReference.createdAt > 5
@@ -683,26 +639,32 @@ function animate() {
         obj.bodyRef.gameReference.toRemove = true;
       }
 
-      // Se o objeto estiver marcado para remoção, remove-o
       if (obj.bodyRef.gameReference.toRemove) {
-        // Verifica se o objeto ainda não foi removido para evitar erros (remover da cena e do mundo físico)
-        const indexInScene = scene.children.indexOf(obj);
-        if (indexInScene !== -1) {
-          scene.remove(obj);
-        }
-        const bodyIndexInWorld = physicsWorld.bodies.indexOf(obj.bodyRef);
-        if (bodyIndexInWorld !== -1) {
+        if (scene.children.includes(obj)) scene.remove(obj);
+        if (physicsWorld.bodies.includes(obj.bodyRef))
           physicsWorld.removeBody(obj.bodyRef);
-        }
-        objectsToUpdate.splice(i, 1); // Remove do array de objetos a serem atualizados
+        objectsToUpdate.splice(i, 1);
       }
     }
   }
 
+  // ✅ ALTERAÇÃO: Lógica para checar e iniciar a transição de nível.
+  if (gameState.waitingForLevelEnd && !gameState.isGameOver) {
+    const projectilesActive = objectsToUpdate.some(
+      (obj) => obj.bodyRef?.isProjectile
+    );
+    if (!projectilesActive) {
+      checkWinCondition();
+      gameState.waitingForLevelEnd = false; // Desativa a flag para não chamar de novo.
+    }
+  }
+
+  // Lógica para Game Over por falta de projéteis
   if (
     gameState.projectiles === 0 &&
     gameState.targets > 0 &&
-    !gameState.isGameOver
+    !gameState.isGameOver &&
+    !gameState.waitingForLevelEnd
   ) {
     if (!objectsToUpdate.some((obj) => obj.bodyRef?.isProjectile)) {
       gameState.isGameOver = true;
@@ -716,5 +678,4 @@ function animate() {
 }
 
 init();
-
 window.addEventListener("resize", onWindowResize);
