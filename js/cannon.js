@@ -26,12 +26,17 @@ export class Cannon {
       this.wheelRadius + this.baseHeight / 2,
       10
     );
-    this.minPitch = -Math.PI / 12;
-    this.maxPitch = Math.PI / 2.5;
+
+    // LÓGICA DE ÂNGULO REFEITA PARA MAIOR CLAREZA
+    // Ajuste dos limites de elevação para permitir movimento total para cima e para baixo
+    this.minElevationDeg = -90; // Permite apontar até 90 graus para baixo (em direção ao chão)
+    this.maxElevationDeg = 90; // Permite apontar até 90 graus para cima (em direção ao céu)
+
     this.trajectoryLine = null;
     this.isAiming = false;
     this.yawAngle = 0;
-    this.pitchAngle = 0;
+    // Ângulo inicial de 45 graus (apontando para cima, em direção ao céu)
+    this.pitchAngle = THREE.MathUtils.degToRad(45);
     this.uiElements = {};
     this.initVisuals();
     this.initPhysics();
@@ -60,11 +65,9 @@ export class Cannon {
       roughness: 0.4,
       metalness: 0.7,
     });
-
     this.basePivot = new THREE.Group();
     this.basePivot.position.copy(this.cannonStartPosition);
     this.scene.add(this.basePivot);
-
     const carriageBodyGeo = new THREE.BoxGeometry(
       this.baseWidth,
       this.baseHeight,
@@ -75,7 +78,6 @@ export class Cannon {
     this.carriageBodyMesh.castShadow = true;
     this.carriageBodyMesh.receiveShadow = true;
     this.basePivot.add(this.carriageBodyMesh);
-
     const wheelGeo = new THREE.CylinderGeometry(
       this.wheelRadius,
       this.wheelRadius,
@@ -83,23 +85,18 @@ export class Cannon {
       24
     );
     wheelGeo.rotateZ(Math.PI / 2);
-
     const wheelPosX = this.baseWidth / 2 + this.wheelThickness / 2;
     const wheelPosY = this.baseHeight / 2 - this.wheelRadius;
-
     const halfDepth = this.baseDepth / 2;
     const wheelZRear = -halfDepth + this.wheelThickness / 2;
-
     this.rearLeftWheel = new THREE.Mesh(wheelGeo, woodMat);
     this.rearLeftWheel.position.set(-wheelPosX, wheelPosY, wheelZRear);
     this.rearLeftWheel.castShadow = true;
     this.carriageBodyMesh.add(this.rearLeftWheel);
-
     this.rearRightWheel = new THREE.Mesh(wheelGeo, woodMat);
     this.rearRightWheel.position.set(wheelPosX, wheelPosY, wheelZRear);
     this.rearRightWheel.castShadow = true;
     this.carriageBodyMesh.add(this.rearRightWheel);
-
     const axleGeo = new THREE.CylinderGeometry(
       0.15,
       0.15,
@@ -110,7 +107,6 @@ export class Cannon {
     rearAxle.rotation.z = Math.PI / 2;
     rearAxle.position.set(0, wheelPosY, wheelZRear);
     this.carriageBodyMesh.add(rearAxle);
-
     const supportArmGeo = new THREE.BoxGeometry(
       this.baseWidth * 0.15,
       this.pivotHeight * 1.6,
@@ -126,7 +122,6 @@ export class Cannon {
       m.castShadow = true;
       m.receiveShadow = true;
       this.carriageBodyMesh.add(m);
-
       const connectorGeo = new THREE.CylinderGeometry(
         0.2,
         0.2,
@@ -142,7 +137,6 @@ export class Cannon {
       );
       this.carriageBodyMesh.add(connector);
     });
-
     const rearLegGeo = new THREE.BoxGeometry(
       this.baseWidth * 0.4,
       this.baseHeight * 0.5,
@@ -157,7 +151,6 @@ export class Cannon {
     rearLeg.castShadow = true;
     rearLeg.receiveShadow = true;
     this.carriageBodyMesh.add(rearLeg);
-
     this.cannonPivot = new THREE.Group();
     this.cannonPivot.position.set(
       0,
@@ -172,8 +165,8 @@ export class Cannon {
       this.barrelLength,
       32
     );
-    barrelGeo.rotateZ(-Math.PI / 2);
-    barrelGeo.translate(this.barrelLength / 2, 0, 0);
+    barrelGeo.rotateZ(-Math.PI / 2); // Rotaciona o cilindro para que seu comprimento fique no eixo X
+    barrelGeo.translate(this.barrelLength / 2, 0, 0); // Move o cilindro para que sua "ponta" (o lado mais estreito) fique no ponto de pivô
 
     this.cannonMesh = new THREE.Mesh(barrelGeo, darkMetalMat);
     this.cannonMesh.castShadow = true;
@@ -202,6 +195,7 @@ export class Cannon {
 
   setUIElements(elements) {
     this.uiElements = elements;
+    this.setElevation(this.pitchAngle); // Sincroniza a UI no início
     this.updateUI();
   }
 
@@ -216,13 +210,15 @@ export class Cannon {
       powerLevelBar,
     } = this.uiElements;
 
+    if (!azimuthInput) return;
+
     const deg = ((THREE.MathUtils.radToDeg(this.yawAngle) % 360) + 360) % 360;
     azimuthInput.value = deg;
     azimuthValueDisplay.textContent = deg.toFixed(0) + "°";
-    elevationInput.value = THREE.MathUtils.radToDeg(-this.pitchAngle).toFixed(
-      0
-    );
+
+    elevationInput.value = THREE.MathUtils.radToDeg(this.pitchAngle).toFixed(0);
     elevationValueDisplay.textContent = elevationInput.value + "°";
+
     const currentPower = parseFloat(powerInput.value);
     powerValueDisplay.textContent = currentPower.toFixed(0) + " m/s";
     powerLevelBar.style.width =
@@ -239,18 +235,17 @@ export class Cannon {
       this.yawAngle
     );
     this.cannonBody.quaternion.copy(this.basePivot.quaternion);
+    this.updateUI();
   }
 
   setElevation(angleRad) {
     this.pitchAngle = THREE.MathUtils.clamp(
       angleRad,
-      this.minPitch,
-      this.maxPitch
+      THREE.MathUtils.degToRad(this.minElevationDeg),
+      THREE.MathUtils.degToRad(this.maxElevationDeg)
     );
-    this.cannonPivot.quaternion.setFromAxisAngle(
-      new THREE.Vector3(1, 0, 0),
-      this.pitchAngle
-    );
+    this.cannonPivot.rotation.x = this.pitchAngle;
+    this.updateUI();
   }
 
   setPower(powerValue) {
@@ -261,10 +256,17 @@ export class Cannon {
     this.updateUI();
   }
 
+  // REVERTIDO para uma abordagem mais direta para obter a direção global do cano
+  // Esta é a maneira mais comum e direta em Three.js para objetos que apontam em Z+ por padrão
+  // (e que o canhão é um filho de pivots que já fazem as rotações necessárias).
+  // Se o seu cilindro foi rotacionado para X+ localmente, getWorldDirection() ainda funcionará
+  // se o Three.js compensar essas rotações de geometria interna ao calcular a direção global.
   getBarrelDirection() {
-    const quat = new THREE.Quaternion();
-    this.cannonMesh.getWorldQuaternion(quat);
-    return new THREE.Vector3(1, 0, 0).applyQuaternion(quat).normalize();
+    const direction = new THREE.Vector3();
+    // Obtém a direção Z+ do cannonMesh no espaço global.
+    // Esta é a abordagem mais direta e geralmente a mais confiável.
+    this.cannonMesh.getWorldDirection(direction);
+    return direction.normalize();
   }
 
   getBarrelTipPosition() {
@@ -279,16 +281,13 @@ export class Cannon {
     const shootingPower = parseFloat(this.uiElements.powerInput.value);
     const dir = this.getBarrelDirection();
     const tip = this.getBarrelTipPosition();
-
-    // ✅ ALTERAÇÃO: Adicionado Damping para atrito/arrasto do projétil
     const ball = new CANNON.Body({
       mass: 20,
       shape: new CANNON.Sphere(this.projectileRadius),
       material: this.projectileMaterial,
-      linearDamping: 0.1, // Simula resistência do ar/fluido.
-      angularDamping: 0.6, // Essencial para frear a rotação e parar de rolar.
+      linearDamping: 0.1,
+      angularDamping: 0.6,
     });
-
     ball.position.copy(tip);
     const initialVelocityVector = new CANNON.Vec3(dir.x, dir.y, dir.z).scale(
       shootingPower
@@ -336,12 +335,7 @@ export class Cannon {
       this.removeTrajectoryLine();
       return;
     }
-    if (this.trajectoryLine) {
-      this.scene.remove(this.trajectoryLine);
-      this.trajectoryLine.geometry.dispose();
-      this.trajectoryLine.material.dispose();
-      this.trajectoryLine = null;
-    }
+    this.removeTrajectoryLine();
     const points = [];
     const dir = this.getBarrelDirection();
     const tip = this.getBarrelTipPosition();
@@ -351,15 +345,20 @@ export class Cannon {
     const g = this.world.gravity.y;
     const dt_step = 0.03;
     const max_steps = 300;
+    const raycastResult = new CANNON.RaycastResult();
+    let previousPos = pos.clone();
     for (let i = 0; i < max_steps; i++) {
-      points.push(pos.clone());
+      points.push(previousPos.clone());
       vel.y += g * dt_step;
       pos.addScaledVector(vel, dt_step);
-      if (pos.y < 0) {
-        points.push(pos.clone());
+      raycastResult.reset();
+      this.world.raycastClosest(previousPos, pos, {}, raycastResult);
+      if (raycastResult.hasHit) {
+        points.push(raycastResult.hitPointWorld.clone());
         break;
       }
-      if (pos.distanceTo(tip) > 500) {
+      previousPos.copy(pos);
+      if (pos.y < -100) {
         break;
       }
     }
@@ -380,11 +379,12 @@ export class Cannon {
   }
 
   removeTrajectoryLine() {
-    if (!this.trajectoryLine) return;
-    this.scene.remove(this.trajectoryLine);
-    this.trajectoryLine.geometry.dispose();
-    this.trajectoryLine.material.dispose();
-    this.trajectoryLine = null;
+    if (this.trajectoryLine) {
+      this.scene.remove(this.trajectoryLine);
+      this.trajectoryLine.geometry.dispose();
+      this.trajectoryLine.material.dispose();
+      this.trajectoryLine = null;
+    }
   }
 
   enableAimingMode() {
@@ -401,9 +401,8 @@ export class Cannon {
     if (!this.isAiming) return;
     const sensitivity = 0.002;
     this.setAzimuth(this.yawAngle - event.movementX * sensitivity);
-    const newPitch = this.pitchAngle - event.movementY * sensitivity;
+    const newPitch = this.pitchAngle + event.movementY * sensitivity;
     this.setElevation(newPitch);
-    this.updateUI();
   }
 
   handleKeyboardAiming(keyCode) {
@@ -418,19 +417,18 @@ export class Cannon {
         this.setAzimuth(this.yawAngle - stepRad);
         break;
       case "ArrowUp":
-        this.setElevation(this.pitchAngle - stepRad);
-        break;
-      case "ArrowDown":
         this.setElevation(this.pitchAngle + stepRad);
         break;
+      case "ArrowDown":
+        this.setElevation(this.pitchAngle - stepRad);
+        break;
     }
-    this.updateUI();
   }
 
-  handlePowerScroll(deltaY) {
-    const powerChange = deltaY * -0.2;
-    const currentPower = parseFloat(this.uiElements.powerInput.value);
-    this.setPower(currentPower + powerChange);
+  handleElevationScroll(deltaY) {
+    const sensitivity = 0.01;
+    const newPitch = this.pitchAngle - deltaY * sensitivity;
+    this.setElevation(newPitch);
   }
 
   getCameraAimPointAndDirection() {

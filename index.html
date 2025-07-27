@@ -144,6 +144,11 @@
         color: #bbdefb;
         line-height: 1.4;
       }
+      .instructions strong.title {
+        color: #ffcc00; /* Destaque para o título da seção */
+        display: block;
+        margin-top: 10px;
+      }
       #power-bar {
         height: 20px;
         background: rgba(0, 0, 0, 0.3);
@@ -200,17 +205,17 @@
         </div>
         <div class="slider-container">
           <span class="key">Elevação</span>
-          <input type="range" id="elevation" min="0" max="70" value="30" />
+          <input type="range" id="elevation" min="0" max="85" value="30" />
           <span class="value-display" id="elevation-value">30°</span>
         </div>
       </div>
 
       <div class="control-group">
-        <label>FORÇA DO DISPARO</label>
+        <label>AJUSTES DE DISPARO</label>
         <div id="power-bar">
           <div id="power-level"></div>
         </div>
-        <div class="slider-container">
+        <div class.slider-container>
           <span class="key">Força</span>
           <input type="range" id="power" min="10" max="100" value="70" />
           <span class="value-display" id="power-value">70 m/s</span>
@@ -221,26 +226,30 @@
       <div id="status">Preparado para disparar</div>
 
       <div class="instructions">
-        <p><strong>Instruções:</strong></p>
+        <p><strong>BÁSICO:</strong></p>
+        <p>• <span class="key">W/A/S/D</span>: Mover a base do canhão</p>
         <p>
-          • Use <span class="key">W/A/S/D</span> para mover a base do canhão
+          • <span class="key">Roda do Mouse</span>: Ajustar a
+          <strong>ELEVAÇÃO</strong>
         </p>
-        <p>• Use <span class="key">Roda do mouse</span> para ajustar a força</p>
-        <p>• Pressione <span class="key">ESPAÇO</span> para DISPARAR!</p>
+        <p>• <span class="key">ESPAÇO</span>: DISPARAR!</p>
+
+        <strong class="title">MODO DE MIRA (FPS):</strong>
         <p>
-          • <span class="key">Clique direito do mouse</span> para entrar no modo
-          de mira.
-        </p>
-        <p>
-          • No modo de mira: Use o <span class="key">mouse</span> ou
-          <span class="key">setas do teclado</span> para ajustar a mira.
+          • <strong>Pressione <span class="key">BOTÃO DIREITO</span></strong> do
+          mouse para travar a mira.
         </p>
         <p>
-          • <span class="key">Clique esquerdo do mouse</span> e arraste para
-          mover a câmera livremente.
+          • Com a mira travada,
+          <strong>mova o <span class="key">MOUSE</span> livremente</strong> para
+          mirar para cima, baixo e para os lados.
         </p>
-        <p>• A linha tracejada mostra a trajetória prevista</p>
-        <p>• Pressione <span class="key">R</span> para reiniciar o nível</p>
+
+        <strong class="title">OUTROS:</strong>
+        <p>
+          • <span class="key">Clique Esquerdo</span>: Orbitar câmera livremente.
+        </p>
+        <p>• <span class="key">R</span>: Reiniciar o nível</p>
       </div>
     </div>
 
@@ -253,6 +262,8 @@
         }
       }
     </script>
-    <script type="module" src="./js/scene.js"></script>
+
+    <!-- PONTO DE ENTRADA ALTERADO -->
+    <script type="module" src="./js/main.js"></script>
   </body>
 </html>
