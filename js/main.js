@@ -41,10 +41,8 @@ let lastFreeCameraPosition = new THREE.Vector3();
 let lastFreeCameraQuaternion = new THREE.Quaternion();
 
 async function init() {
-  // 1. Carregar Assets
   await assetManager.load();
 
-  // 2. Configurar Motores
   const engine = setupEngine();
   scene = engine.scene;
   camera = engine.camera;
@@ -58,7 +56,6 @@ async function init() {
 
   particleSystem = new ParticleSystem(scene);
 
-  // 3. Criar o Mundo
   createWorld(
     scene,
     physicsWorld,
@@ -67,7 +64,6 @@ async function init() {
     physics.defaultMaterial
   );
 
-  // 4. Instanciar Objetos do Jogo
   gameCannon = new Cannon(
     scene,
     physicsWorld,
@@ -75,7 +71,6 @@ async function init() {
     physics.projectileMaterial
   );
 
-  // 5. Inicializar Módulos Gerenciadores
   initGameManager({
     scene,
     physicsWorld,
@@ -109,97 +104,92 @@ async function init() {
     actions
   );
 
-  // 6. Iniciar o jogo
   loadLevel(0);
   animate();
 }
 
 // ===================================================================
-// INÍCIO DA FUNÇÃO AJUSTADA: handleCannonMovement
+// INÍCIO DA FUNÇÃO handleCannonMovement (CORRIGIDA)
 // ===================================================================
 function handleCannonMovement(deltaTime) {
-  // Pega o estado da mira e das teclas pressionadas a cada quadro
   const { isAiming } = getInputState();
   const keys = getMovementKeys();
   const speed = 20;
   let vx = 0,
     vz = 0;
 
+  const upVector = new THREE.Vector3(0, 1, 0);
+
   if (isAiming) {
-    // --- NOVA LÓGICA DE MOVIMENTO (MODO MIRA ATIVADA) ---
-
-    // 1. Pega a direção EXATA para onde o cano do canhão está apontando.
-    // Esta direção vem da função `getBarrelDirection` que já tínhamos.
+    // LÓGICA MODO MIRA (FPS) - Já estava correta
     const aimDirection = gameCannon.getBarrelDirection();
-    aimDirection.y = 0; // Ignora o eixo Y para movimento no chão.
-    aimDirection.normalize(); // Garante que o vetor tenha comprimento 1.
+    aimDirection.y = 0;
+    aimDirection.normalize();
 
-    // 2. Calcula o vetor "direita" que é perpendicular à direção da mira.
-    // Isso é feito usando o produto vetorial (cross product) com o vetor "para cima" do mundo.
-    const rightDirection = new THREE.Vector3().crossVectors(
-      new THREE.Vector3(0, 1, 0),
-      aimDirection
-    );
+    const rightDirection = new THREE.Vector3()
+      .crossVectors(aimDirection, upVector)
+      .normalize();
 
-    // 3. Aplica as forças com base na direção da MIRA.
     if (keys.KeyW) {
-      // Frente
       vx += aimDirection.x * speed;
       vz += aimDirection.z * speed;
     }
     if (keys.KeyS) {
-      // Trás
       vx -= aimDirection.x * speed;
       vz -= aimDirection.z * speed;
     }
     if (keys.KeyA) {
-      // Strafe para a Esquerda
       vx -= rightDirection.x * speed;
       vz -= rightDirection.z * speed;
     }
     if (keys.KeyD) {
-      // Strafe para a Direita
       vx += rightDirection.x * speed;
       vz += rightDirection.z * speed;
     }
   } else {
-    // --- LÓGICA DE MOVIMENTO ORIGINAL (MODO "TANQUE" - MIRA DESATIVADA) ---
-    // A lógica aqui permanece a mesma, baseada na orientação do CHASSI do canhão.
-
-    const forwardDirection = new THREE.Vector3(0, 0, -1)
-      .applyQuaternion(gameCannon.basePivot.quaternion)
-      .normalize();
+    // --- LÓGICA MODO TANQUE (SEM MIRA) ---
+    const forwardDirection = new THREE.Vector3(0, 0, -1).applyQuaternion(
+      gameCannon.basePivot.quaternion
+    );
     forwardDirection.y = 0;
     forwardDirection.normalize();
-    const rightDirection = new THREE.Vector3()
-      .crossVectors(new THREE.Vector3(0, 1, 0), forwardDirection)
-      .normalize();
 
+    // <<< CORREÇÃO DA LÓGICA INVERTIDA >>>
+    // Trocamos `+=` por `-=` e vice-versa para que o movimento corresponda à tecla pressionada.
+    // Isso alinha o controle à orientação do seu modelo 3D.
     if (keys.KeyW) {
-      vx += forwardDirection.x * speed;
-      vz += forwardDirection.z * speed;
-    }
-    if (keys.KeyS) {
+      // Frente
       vx -= forwardDirection.x * speed;
       vz -= forwardDirection.z * speed;
     }
-    // A e D movem o chassi para os lados. Poderiam também ser usados para ROTACIONAR, mas vamos manter o strafe.
-    if (keys.KeyA) {
-      vx -= rightDirection.x * speed;
-      vz -= rightDirection.z * speed;
+    if (keys.KeyS) {
+      // Trás
+      vx += forwardDirection.x * speed;
+      vz += forwardDirection.z * speed;
     }
-    if (keys.KeyD) {
+
+    const rightDirection = new THREE.Vector3()
+      .crossVectors(forwardDirection, upVector)
+      .normalize();
+
+    // <<< CORREÇÃO DA LÓGICA INVERTIDA (LATERAL) >>>
+    if (keys.KeyA) {
+      // Esquerda
       vx += rightDirection.x * speed;
       vz += rightDirection.z * speed;
     }
+    if (keys.KeyD) {
+      // Direita
+      vx -= rightDirection.x * speed;
+      vz -= rightDirection.z * speed;
+    }
   }
 
-  // Aplica a velocidade calculada (seja da mira ou do modo tanque) ao corpo físico do canhão.
   gameCannon.cannonBody.velocity.x = vx;
   gameCannon.cannonBody.velocity.z = vz;
 }
 // ===================================================================
-// FIM DA FUNÇÃO AJUSTADA
+// FIM DA FUNÇÃO handleCannonMovement
 // ===================================================================
 
 function updateCamera() {
@@ -224,10 +214,10 @@ function updateCamera() {
       dynamicAimMesh.visible = false;
     }
   } else if (isOrbiting) {
+    // Câmera está sendo orbitada manualmente pelo botão esquerdo do mouse
     controls.update();
   } else {
-    camera.position.lerp(lastFreeCameraPosition, 0.05);
-    camera.quaternion.slerp(lastFreeCameraQuaternion, 0.05);
+    // Câmera seguindo o canhão automaticamente
     controls.target.copy(gameCannon.getCannonPositionForCamera());
     controls.update();
   }

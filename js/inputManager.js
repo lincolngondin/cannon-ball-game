@@ -1,3 +1,5 @@
+// js/inputManager.js
+
 import * as THREE from "three";
 
 // Estado de controle de input
@@ -33,16 +35,11 @@ export function initInputManager(deps, gameActions) {
 
 // Retorna estados para o loop principal
 export const getInputState = () => ({ isAiming, isOrbiting });
-
-// Retorna as teclas pressionadas para movimento
 export const getMovementKeys = () => keysPressed;
 
 function onKeyDown(e) {
   if (e.code in keysPressed) keysPressed[e.code] = true;
   if (e.code === "KeyR") actions.reset();
-  if (isAiming && !isOrbiting) {
-    gameCannon.handleKeyboardAiming(e.code);
-  }
   if (e.code === "Space") {
     e.preventDefault();
     actions.shoot();
@@ -55,9 +52,8 @@ function onKeyUp(e) {
 
 function onMouseDown(e) {
   if (e.button === 2) {
-    // Botão direito
-    isAiming = !isAiming;
-    if (isAiming) {
+    if (!isAiming) {
+      isAiming = true;
       lastFreeCameraPosition.copy(controls.object.position);
       lastFreeCameraQuaternion.copy(controls.object.quaternion);
       controls.enabled = false;
@@ -69,8 +65,6 @@ function onMouseDown(e) {
       document.exitPointerLock();
     }
   } else if (e.button === 0) {
-    // Botão esquerdo
-    // Permite orbitar apenas se não estiver mirando e não clicou na UI
     if (!isAiming && e.target.tagName === "CANVAS") {
       isOrbiting = true;
       controls.enabled = true;
@@ -89,7 +83,7 @@ function onMouseUp(e) {
 }
 
 function onPointerLockChange() {
-  if (document.pointerLockElement !== renderer.domElement && isAiming) {
+  if (document.pointerLockElement !== renderer.domElement) {
     isAiming = false;
     crosshair.style.display = "none";
     dynamicAimMesh.visible = false;
@@ -100,13 +94,15 @@ function onPointerLockChange() {
 }
 
 function onMouseMove(e) {
-  if (isAiming && !isOrbiting) {
+  if (isAiming) {
     gameCannon.handleAimingMouseMove(e);
   }
 }
 
+// <<< FUNÇÃO `onWheel` SIMPLIFICADA >>>
 function onWheel(e) {
   e.preventDefault();
-  // A roda do mouse agora ajusta a elevação do canhão
-  gameCannon.handleElevationScroll(e.deltaY);
+
+  // Agora, o scroll do mouse sempre controlará a força do disparo.
+  gameCannon.handlePowerScroll(e.deltaY);
 }
