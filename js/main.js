@@ -1,3 +1,5 @@
+// js/main.js
+
 import * as THREE from "three";
 import * as CANNON from "cannon-es";
 import { assetManager } from "./assetManager.js";
@@ -74,7 +76,6 @@ async function init() {
   );
 
   // 5. Inicializar Módulos Gerenciadores
-  // CORREÇÃO: Adicionamos targetPhysicsMaterial à lista de dependências.
   initGameManager({
     scene,
     physicsWorld,
@@ -113,41 +114,93 @@ async function init() {
   animate();
 }
 
+// ===================================================================
+// INÍCIO DA FUNÇÃO AJUSTADA: handleCannonMovement
+// ===================================================================
 function handleCannonMovement(deltaTime) {
+  // Pega o estado da mira e das teclas pressionadas a cada quadro
+  const { isAiming } = getInputState();
   const keys = getMovementKeys();
   const speed = 20;
   let vx = 0,
     vz = 0;
 
-  const forwardDirection = new THREE.Vector3(0, 0, -1)
-    .applyQuaternion(gameCannon.basePivot.quaternion)
-    .normalize();
-  forwardDirection.y = 0;
-  forwardDirection.normalize();
-  const rightDirection = new THREE.Vector3()
-    .crossVectors(new THREE.Vector3(0, 1, 0), forwardDirection)
-    .normalize();
+  if (isAiming) {
+    // --- NOVA LÓGICA DE MOVIMENTO (MODO MIRA ATIVADA) ---
 
-  if (keys.KeyW) {
-    vx += forwardDirection.x * speed;
-    vz += forwardDirection.z * speed;
-  }
-  if (keys.KeyS) {
-    vx -= forwardDirection.x * speed;
-    vz -= forwardDirection.z * speed;
-  }
-  if (keys.KeyA) {
-    vx -= rightDirection.x * speed;
-    vz -= rightDirection.z * speed;
-  }
-  if (keys.KeyD) {
-    vx += rightDirection.x * speed;
-    vz += rightDirection.z * speed;
+    // 1. Pega a direção EXATA para onde o cano do canhão está apontando.
+    // Esta direção vem da função `getBarrelDirection` que já tínhamos.
+    const aimDirection = gameCannon.getBarrelDirection();
+    aimDirection.y = 0; // Ignora o eixo Y para movimento no chão.
+    aimDirection.normalize(); // Garante que o vetor tenha comprimento 1.
+
+    // 2. Calcula o vetor "direita" que é perpendicular à direção da mira.
+    // Isso é feito usando o produto vetorial (cross product) com o vetor "para cima" do mundo.
+    const rightDirection = new THREE.Vector3().crossVectors(
+      new THREE.Vector3(0, 1, 0),
+      aimDirection
+    );
+
+    // 3. Aplica as forças com base na direção da MIRA.
+    if (keys.KeyW) {
+      // Frente
+      vx += aimDirection.x * speed;
+      vz += aimDirection.z * speed;
+    }
+    if (keys.KeyS) {
+      // Trás
+      vx -= aimDirection.x * speed;
+      vz -= aimDirection.z * speed;
+    }
+    if (keys.KeyA) {
+      // Strafe para a Esquerda
+      vx -= rightDirection.x * speed;
+      vz -= rightDirection.z * speed;
+    }
+    if (keys.KeyD) {
+      // Strafe para a Direita
+      vx += rightDirection.x * speed;
+      vz += rightDirection.z * speed;
+    }
+  } else {
+    // --- LÓGICA DE MOVIMENTO ORIGINAL (MODO "TANQUE" - MIRA DESATIVADA) ---
+    // A lógica aqui permanece a mesma, baseada na orientação do CHASSI do canhão.
+
+    const forwardDirection = new THREE.Vector3(0, 0, -1)
+      .applyQuaternion(gameCannon.basePivot.quaternion)
+      .normalize();
+    forwardDirection.y = 0;
+    forwardDirection.normalize();
+    const rightDirection = new THREE.Vector3()
+      .crossVectors(new THREE.Vector3(0, 1, 0), forwardDirection)
+      .normalize();
+
+    if (keys.KeyW) {
+      vx += forwardDirection.x * speed;
+      vz += forwardDirection.z * speed;
+    }
+    if (keys.KeyS) {
+      vx -= forwardDirection.x * speed;
+      vz -= forwardDirection.z * speed;
+    }
+    // A e D movem o chassi para os lados. Poderiam também ser usados para ROTACIONAR, mas vamos manter o strafe.
+    if (keys.KeyA) {
+      vx -= rightDirection.x * speed;
+      vz -= rightDirection.z * speed;
+    }
+    if (keys.KeyD) {
+      vx += rightDirection.x * speed;
+      vz += rightDirection.z * speed;
+    }
   }
 
+  // Aplica a velocidade calculada (seja da mira ou do modo tanque) ao corpo físico do canhão.
   gameCannon.cannonBody.velocity.x = vx;
   gameCannon.cannonBody.velocity.z = vz;
 }
+// ===================================================================
+// FIM DA FUNÇÃO AJUSTADA
+// ===================================================================
 
 function updateCamera() {
   const { isAiming, isOrbiting } = getInputState();

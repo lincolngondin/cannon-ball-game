@@ -1,10 +1,10 @@
+// js/gameManager.js (COMPLETO E MODIFICADO)
+
 import * as THREE from "three";
 import * as CANNON from "cannon-es";
 import { assetManager } from "./assetManager.js";
 import { uiElements, updateGameUI } from "./uiManager.js";
 
-// Módulo-nível de dependências
-// CORREÇÃO: Adicionada a variável _targetPhysicsMaterial
 let _scene,
   _physicsWorld,
   _particleSystem,
@@ -33,28 +33,69 @@ export function initGameManager(dependencies) {
   _particleSystem = dependencies.particleSystem;
   _objectsToUpdate = dependencies.objectsToUpdate;
   _clock = dependencies.clock;
-  // CORREÇÃO: Armazenar a referência ao material do alvo
   _targetPhysicsMaterial = dependencies.targetPhysicsMaterial;
 }
 
+// <<< NOVO: NÍVEIS 3 E 4 ADICIONADOS COM ALVOS MÓVEIS >>>
 const levels = [
   {
     name: "Nível 1",
     projectiles: 20,
     setup: () => {
-      createTarget(new THREE.Vector3(0, 8, -15));
-      createTarget(new THREE.Vector3(15, 8, -10));
-      createTarget(new THREE.Vector3(-15, 8, -10));
+      createTarget({ position: new THREE.Vector3(0, 8, -15) });
+      createTarget({ position: new THREE.Vector3(15, 8, -10) });
+      createTarget({ position: new THREE.Vector3(-15, 8, -10) });
     },
   },
   {
     name: "Nível 2",
     projectiles: 15,
     setup: () => {
-      createTarget(new THREE.Vector3(-25, 12, -20));
-      createTarget(new THREE.Vector3(0, 15, -40));
-      createTarget(new THREE.Vector3(25, 12, -20));
-      createTarget(new THREE.Vector3(10, 5, -50));
+      createTarget({ position: new THREE.Vector3(-25, 12, -20) });
+      createTarget({ position: new THREE.Vector3(0, 15, -40) });
+      createTarget({ position: new THREE.Vector3(25, 12, -20) });
+      createTarget({ position: new THREE.Vector3(10, 5, -50) });
+    },
+  },
+  {
+    name: "Nível 3 - O Patrulheiro",
+    projectiles: 10,
+    setup: () => {
+      // Alvo estático de isca
+      createTarget({ position: new THREE.Vector3(0, 5, -20) });
+      // Alvo móvel
+      createTarget({
+        position: new THREE.Vector3(0, 15, -50),
+        movementPattern: {
+          type: "horizontal-sine", // Padrão de movimento
+          amplitude: 25, // Distância que se move para cada lado
+          speed: 0.4, // Velocidade do movimento
+        },
+      });
+    },
+  },
+  {
+    name: "Nível 4 - Desafio Final",
+    projectiles: 15,
+    setup: () => {
+      // Obstáculo
+      const obstacle = assetManager.models.rockLargeB.clone();
+      obstacle.scale.set(10, 10, 10);
+      obstacle.position.set(0, 0, -45);
+      _scene.add(obstacle);
+
+      // Alvo móvel horizontal atrás do obstáculo
+      createTarget({
+        position: new THREE.Vector3(0, 8, -60),
+        movementPattern: { type: "horizontal-sine", amplitude: 30, speed: 0.8 },
+      });
+      // Alvo móvel vertical
+      createTarget({
+        position: new THREE.Vector3(-35, 10, -30),
+        movementPattern: { type: "vertical-sine", amplitude: 10, speed: 0.5 },
+      });
+      // Alvo estático bem alto
+      createTarget({ position: new THREE.Vector3(30, 25, -40) });
     },
   },
 ];
@@ -94,7 +135,7 @@ export function loadLevel(levelIndex) {
   gameState.waitingForLevelEnd = false;
   level.setup();
   updateGameUI(gameState);
-  uiElements.statusDisplay.textContent = `Nível ${levelIndex + 1} - Preparado`;
+  uiElements.statusDisplay.textContent = `${level.name} - Preparado`;
 }
 
 function onProjectileHit(event) {
@@ -123,7 +164,8 @@ function onProjectileHit(event) {
   }
 }
 
-function createTarget(position) {
+// <<< FUNÇÃO MODIFICADA PARA ACEITAR PADRÕES DE MOVIMENTO >>>
+function createTarget({ position, movementPattern = null }) {
   const model = assetManager.models.statueBlock.clone();
   model.traverse((n) => {
     if (n.isMesh) {
@@ -137,16 +179,24 @@ function createTarget(position) {
   const size = 1.8;
   const shape = new CANNON.Box(new CANNON.Vec3(size / 2, size / 2, size / 2));
 
-  // CORREÇÃO: Usar a variável de material correta
-  const body = new CANNON.Body({
-    mass: 10,
+  // Se tem padrão de movimento, será um corpo KINEMATIC. Senão, DINÂMICO.
+  const bodyOptions = {
+    mass: movementPattern ? 0 : 10, // Corpos cinemáticos têm massa 0
     shape: shape,
     position: new CANNON.Vec3().copy(position),
     material: _targetPhysicsMaterial,
-  });
+    type: movementPattern ? CANNON.Body.KINEMATIC : CANNON.Body.DYNAMIC,
+  };
+
+  const body = new CANNON.Body(bodyOptions);
 
   body.isTarget = true;
-  body.gameReference = { toRemove: false, meshRef: model };
+  body.gameReference = {
+    toRemove: false,
+    meshRef: model,
+    movementPattern: movementPattern, // Armazena o padrão de movimento
+    initialPosition: position.clone(), // Armazena a posição inicial para o cálculo
+  };
   model.bodyRef = body;
 
   _scene.add(model);
@@ -170,6 +220,12 @@ function clearLevel() {
     }
   }
   _objectsToUpdate.length = 0;
+
+  // Limpa também qualquer obstáculo adicionado
+  const obstacle = _scene.getObjectByName("obstacle");
+  if (obstacle) {
+    _scene.remove(obstacle);
+  }
 }
 
 function checkWinCondition() {
@@ -181,7 +237,30 @@ function checkWinCondition() {
   }, 2000);
 }
 
+// <<< FUNÇÃO MODIFICADA PARA MOVER OS ALVOS >>>
 export function updateGameLogic() {
+  // 1. Lógica de movimento para alvos cinemáticos
+  const elapsedTime = _clock.getElapsedTime();
+  for (const obj of _objectsToUpdate) {
+    if (obj.bodyRef && obj.bodyRef.gameReference?.movementPattern) {
+      const { movementPattern, initialPosition } = obj.bodyRef.gameReference;
+      const { type, amplitude, speed } = movementPattern;
+
+      const newPosition = initialPosition.clone();
+      const offset = amplitude * Math.sin(elapsedTime * speed);
+
+      if (type === "horizontal-sine") {
+        newPosition.x += offset;
+      } else if (type === "vertical-sine") {
+        newPosition.y += offset;
+      }
+
+      // Atualiza a posição do corpo cinemático diretamente
+      obj.bodyRef.position.copy(newPosition);
+    }
+  }
+
+  // 2. Lógica de fim de nível
   if (gameState.waitingForLevelEnd && !gameState.isGameOver) {
     const projectilesActive = _objectsToUpdate.some(
       (obj) => obj.bodyRef?.isProjectile && !obj.bodyRef.gameReference.toRemove
@@ -192,6 +271,7 @@ export function updateGameLogic() {
     }
   }
 
+  // 3. Lógica de derrota (Game Over)
   if (
     gameState.projectiles === 0 &&
     gameState.targets > 0 &&
