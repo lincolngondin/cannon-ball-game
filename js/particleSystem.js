@@ -30,17 +30,77 @@ export class ParticleSystem {
     ps.position.copy(position);
     this.scene.add(ps);
 
+    // Cores de poeira: cinza claro, cinza escuro, branco
+    const colors = [0xcccccc, 0x888888, 0xffffff];
+    const colorAttr = [];
     const particles = [];
-    for (let i = 0; i < 50; i++) {
+    const positions = ps.geometry.attributes.position.array;
+    for (let i = 0; i < 40; i++) { // Menos partículas para explosão sutil
+      colorAttr.push(colors[Math.floor(Math.random() * colors.length)]);
+      const vel = new THREE.Vector3(
+        (Math.random() - 0.5) * 8,
+        (Math.random() - 0.5) * 8,
+        (Math.random() - 0.5) * 8
+      );
       particles.push({
-        velocity: new THREE.Vector3(
-          (Math.random() - 0.5) * 10,
-          (Math.random() - 0.5) * 10,
-          (Math.random() - 0.5) * 10
-        ),
+        velocity: vel,
         alpha: 1.0,
+        scale: 0.18 + Math.random() * 0.15,
       });
+      positions[i * 3] = 0;
+      positions[i * 3 + 1] = 0;
+      positions[i * 3 + 2] = 0;
     }
+    ps.geometry.setAttribute(
+      "color",
+      new THREE.Float32BufferAttribute(colorAttr, 1)
+    );
+    ps.material.vertexColors = true;
+    ps.geometry.attributes.position.needsUpdate = true;
+    this.active.push({ points: ps, particles, time: 0 });
+  }
+
+  cannonBlast(position, direction) {
+    const ps = this.getParticleSet();
+    ps.position.copy(position);
+    this.scene.add(ps);
+
+    // Cores: fumaça (cinza) e faíscas (amarelo/laranja)
+    const colors = [0xcccccc, 0x888888, 0xffd700, 0xffa500];
+    const colorAttr = [];
+    const particles = [];
+    const positions = ps.geometry.attributes.position.array;
+    for (let i = 0; i < 60; i++) {
+      // Fumaça nos primeiros 40, faíscas nos últimos 20
+      const isSpark = i >= 40;
+      const color = isSpark
+        ? colors[2 + Math.floor(Math.random() * 2)]
+        : colors[Math.floor(Math.random() * 2)];
+      colorAttr.push(color);
+
+      const speed = isSpark ? 12 + Math.random() * 8 : 4 + Math.random() * 2;
+      const spread = isSpark ? 0.7 : 1.5;
+      const vel = new THREE.Vector3(
+        direction.x + (Math.random() - 0.5) * spread,
+        direction.y + (Math.random() - 0.5) * spread,
+        direction.z + (Math.random() - 0.5) * spread
+      ).normalize().multiplyScalar(speed);
+
+      particles.push({
+        velocity: vel,
+        alpha: 1.0,
+        scale: isSpark ? 0.15 : 0.35 + Math.random() * 0.2,
+      });
+      positions[i * 3] = 0;
+      positions[i * 3 + 1] = 0;
+      positions[i * 3 + 2] = 0;
+    }
+    ps.geometry.setAttribute(
+      "color",
+      new THREE.Float32BufferAttribute(colorAttr, 1)
+    );
+    ps.material.vertexColors = true;
+    ps.geometry.attributes.position.needsUpdate = true;
     this.active.push({ points: ps, particles, time: 0 });
   }
 

@@ -18,6 +18,7 @@ export const gameState = {
   projectiles: 100,
   isGameOver: false,
   waitingForLevelEnd: false,
+  score: 0, // NOVO: pontuação
 };
 
 const targetMaterial = new THREE.MeshStandardMaterial({
@@ -116,17 +117,28 @@ export function shootProjectile(gameCannon) {
     };
     projectileMesh.bodyRef.addEventListener("collide", onProjectileHit);
     _objectsToUpdate.push(projectileMesh);
+
+    // EFEITO DE FUMAÇA E FAÍSCAS NA BOCA DO CANHÃO
+    if (_particleSystem && typeof _particleSystem.cannonBlast === "function") {
+      const mouthPos = gameCannon.getBarrelTipPosition();
+      const shootDir = gameCannon.getBarrelDirection();
+      _particleSystem.cannonBlast(mouthPos, shootDir);
+    }
   }
 }
 
 export function loadLevel(levelIndex) {
   clearLevel();
+  // NÃO zera a pontuação ao iniciar nível!
   const level = levels[levelIndex];
   if (!level) {
     gameState.isGameOver = true;
     uiElements.statusDisplay.textContent =
       "Você venceu o jogo! (Pressione R para reiniciar)";
     alert("Parabéns, você completou todos os níveis!");
+    // Zera a pontuação ao terminar o jogo
+    gameState.score = 0;
+    updateGameUI(gameState);
     return;
   }
   gameState.currentLevel = levelIndex;
@@ -149,8 +161,12 @@ function onProjectileHit(event) {
   ) {
     otherBody.gameReference.toRemove = true;
     gameState.targets--;
+    gameState.score++; // NOVO: incrementa pontuação
     updateGameUI(gameState);
-    _particleSystem.explode(new THREE.Vector3().copy(otherBody.position));
+
+    if (_particleSystem && typeof _particleSystem.explode === "function") {
+      _particleSystem.explode(new THREE.Vector3().copy(otherBody.position));
+    }
 
     if (projectileBody.gameReference) {
       projectileBody.gameReference.toRemove = true;
@@ -286,6 +302,16 @@ export function updateGameLogic() {
       uiElements.statusDisplay.textContent =
         "Sem projéteis! (Pressione R para reiniciar)";
       alert("Sem projéteis! (Pressione R para reiniciar)");
+      // Zera a pontuação ao perder
+      gameState.score = 0;
+      updateGameUI(gameState);
     }
   }
+}
+
+// Exemplo de função de reinício
+export function restartGame() {
+  gameState.score = 0;
+  // ...demais lógicas de reinício...
+  updateGameUI(gameState);
 }

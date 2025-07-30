@@ -3,6 +3,7 @@ import * as THREE from "three";
 export const uiElements = {
   targetsDisplay: document.getElementById("targets-display"),
   projectilesDisplay: document.getElementById("projectiles-display"),
+  scoreDisplay: document.getElementById("score-display"), // NOVO
   crosshair: document.getElementById("crosshair"),
   uiContainer: document.getElementById("ui-container"),
   toggleUiButton: document.getElementById("toggle-ui-button"),
@@ -48,4 +49,5 @@ export function initUIManager(callbacks) {
 export function updateGameUI(gameState) {
   uiElements.targetsDisplay.textContent = gameState.targets;
   uiElements.projectilesDisplay.textContent = gameState.projectiles;
+  uiElements.scoreDisplay.textContent = gameState.score; // NOVO
 }
