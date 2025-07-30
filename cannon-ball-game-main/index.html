@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Desafio de Arremesso</title>
+    <style>
+      body {
+        margin: 0;
+        overflow: hidden;
+        background-color: #000;
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        color: white;
+      }
+      canvas {
+        display: block;
+      }
+      #hud {
+        position: absolute;
+        top: 20px;
+        right: 20px;
+        font-size: 1.5em;
+        background: rgba(0, 0, 0, 0.5);
+        padding: 10px;
+        border-radius: 5px;
+        color: white;
+        font-family: sans-serif;
+        z-index: 10;
+      }
+      #crosshair {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        width: 10px;
+        height: 10px;
+        border: 2px solid white;
+        border-radius: 50%;
+        transform: translate(-50%, -50%);
+        display: none;
+        mix-blend-mode: difference;
+        z-index: 5;
+      }
+
+      /* Estilos da nova UI, copiados do seu HTML antigo */
+      #ui-container {
+        position: absolute;
+        top: 20px;
+        left: 20px;
+        background: rgba(0, 0, 30, 0.7);
+        padding: 15px;
+        border-radius: 10px;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+        max-width: 300px;
+        backdrop-filter: blur(5px);
+        z-index: 10;
+      }
+      h1 {
+        margin: 0 0 15px 0;
+        font-size: 1.8em;
+        color: #ffcc00;
+        text-shadow: 0 0 10px rgba(255, 204, 0, 0.5);
+        text-align: center;
+      }
+      .control-group {
+        margin-bottom: 15px;
+        padding-bottom: 15px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+      }
+      .control-group:last-child {
+        border-bottom: none;
+      }
+      label {
+        display: block;
+        margin-bottom: 5px;
+        font-weight: bold;
+        color: #4fc3f7;
+      }
+      .slider-container {
+        display: flex;
+        align-items: center;
+        margin-bottom: 10px;
+      }
+      .slider-container input {
+        flex: 1;
+        margin-right: 10px;
+        /* Oculta os sliders visuais */
+        -webkit-appearance: none;
+        width: 100%;
+        height: 0; /* Torna-o invisível */
+        background: transparent;
+        outline: none;
+        opacity: 0;
+        pointer-events: none; /* Desabilita interação */
+      }
+      .value-display {
+        min-width: 60px;
+        text-align: right;
+        font-family: monospace;
+        font-size: 1.1em;
+        color: #fff;
+      }
+      button {
+        width: 100%;
+        padding: 10px;
+        background: linear-gradient(to bottom, #ff5722, #e64a19);
+        color: white;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        font-weight: bold;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+        transition: all 0.2s;
+      }
+      button:hover {
+        background: linear-gradient(to bottom, #ff7043, #f4511e);
+        transform: translateY(-2px);
+        box-shadow: 0 6px 8px rgba(0, 0, 0, 0.4);
+      }
+      button:active {
+        transform: translateY(1px);
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+      }
+      #status {
+        margin-top: 10px;
+        padding: 10px;
+        background: rgba(0, 0, 0, 0.3);
+        border-radius: 5px;
+        text-align: center;
+        font-size: 0.9em;
+      }
+      .key {
+        display: inline-block;
+        padding: 2px 6px;
+        background: rgba(255, 255, 255, 0.2);
+        border-radius: 4px;
+        margin: 0 2px;
+        font-family: monospace;
+      }
+      .instructions {
+        font-size: 0.85em;
+        margin-top: 15px;
+        color: #bbdefb;
+        line-height: 1.4;
+      }
+      .instructions strong.title {
+        color: #ffcc00; /* Destaque para o título da seção */
+        display: block;
+        margin-top: 10px;
+      }
+      #power-bar {
+        height: 20px;
+        background: rgba(0, 0, 0, 0.3);
+        border-radius: 10px;
+        margin-top: 5px;
+        overflow: hidden;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+      }
+      #power-level {
+        height: 100%;
+        width: 50%;
+        background: linear-gradient(to right, #00c853, #ffd600, #ff3d00);
+        border-radius: 10px;
+        transition: width 0.1s;
+      }
+      #toggle-ui-button {
+        position: absolute;
+        top: 20px;
+        left: 330px;
+        padding: 8px 12px;
+        background: rgba(0, 0, 0, 0.6);
+        color: white;
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        border-radius: 5px;
+        cursor: pointer;
+        font-size: 0.9em;
+        z-index: 10;
+        transition: background 0.2s;
+      }
+      #toggle-ui-button:hover {
+        background: rgba(0, 0, 0, 0.8);
+      }
+    </style>
+  </head>
+  <body>
+    <div id="hud">
+      Alvos: <span id="targets-display">0</span> | Projéteis:
+      <span id="projectiles-display">0</span> | Pontuação:
+      <span id="score-display">0</span>
+    </div>
+
+    <button id="toggle-ui-button">Ocultar UI</button>
+
+    <div id="crosshair"></div>
+
+    <div id="ui-container">
+      <h1>CANHÃO BALÍSTICO</h1>
+
+      <div class="control-group">
+        <label>CONTROLES DO CANHÃO</label>
+        <div class="slider-container">
+          <span class="key">Azimute</span>
+          <input type="range" id="azimuth" min="0" max="360" value="0" />
+          <span class="value-display" id="azimuth-value">0°</span>
+        </div>
+        <div class="slider-container">
+          <span class="key">Elevação</span>
+          <input type="range" id="elevation" min="0" max="85" value="30" />
+          <span class="value-display" id="elevation-value">30°</span>
+        </div>
+      </div>
+
+      <div class="control-group">
+        <label>AJUSTES DE DISPARO</label>
+        <div id="power-bar">
+          <div id="power-level"></div>
+        </div>
+        <div class.slider-container>
+          <span class="key">Força</span>
+          <input type="range" id="power" min="10" max="100" value="70" />
+          <span class="value-display" id="power-value">70 m/s</span>
+        </div>
+        <button id="fire-button">DISPARAR! (ESPAÇO)</button>
+      </div>
+
+      <div id="status">Preparado para disparar</div>
+
+      <div class="instructions">
+        <p><strong>BÁSICO:</strong></p>
+        <p>• <span class="key">W/A/S/D</span>: Mover a base do canhão</p>
+        <p>
+          • <span class="key">Roda do Mouse</span>: Ajustar a
+          <strong>FORÇA</strong>
+        </p>
+        <p>• <span class="key">ESPAÇO</span>: DISPARAR!</p>
+
+        <strong class="title">MODO DE MIRA (FPS):</strong>
+        <p>
+          • <strong>Pressione <span class="key">BOTÃO DIREITO</span></strong> do
+          mouse para travar a mira.
+        </p>
+        <p>
+          • Com a mira travada,
+          <strong>mova o <span class="key">MOUSE</span> livremente</strong> para
+          mirar para cima, baixo e para os lados.
+        </p>
+
+        <strong class="title">OUTROS:</strong>
+        <p>
+          • <span class="key">Clique Esquerdo</span>: Orbitar câmera livremente.
+        </p>
+        <p>• <span class="key">R</span>: Reiniciar o nível</p>
+      </div>
+    </div>
+
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://unpkg.com/three@0.165.0/build/three.module.js",
+          "three/addons/": "https://unpkg.com/three@0.165.0/examples/jsm/",
+          "cannon-es": "https://unpkg.com/cannon-es@0.20.0/dist/cannon-es.js"
+        }
+      }
+    </script>
+
+    <!-- PONTO DE ENTRADA ALTERADO -->
+    <script type="module" src="./js/main.js"></script>
+  </body>
+</html>
