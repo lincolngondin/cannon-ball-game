@@ -10,6 +10,7 @@
   "description": "",
   "dependencies": {
     "cannon": "github:schteppe/cannon.js",
+    "cannon-es": "^0.20.0",
     "three": "^0.178.0"
   },
   "devDependencies": {
