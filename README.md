@@ -1,6 +1,8 @@
-# Jogo Bala de Canhao
+# Jogo Bala de Canhão
 
 Jogo bala de canhão feito em three.js com cannon.js pela equipe 5 (Lincoln, Ruan, Enzo).
+<img width="1867" height="1073" alt="Screenshot From 2025-07-31 15-03-15" src="https://github.com/user-attachments/assets/2e75a509-5c02-46e9-8f1d-c43f456e0a95" />
+<img width="1867" height="1072" alt="Screenshot From 2025-07-31 15-02-42" src="https://github.com/user-attachments/assets/d6eefb7a-2351-40d0-be10-6d85b00ed1f3" />
 
 ## Funcionalidades
 
