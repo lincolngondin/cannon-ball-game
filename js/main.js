@@ -108,9 +108,6 @@ async function init() {
   animate();
 }
 
-// ===================================================================
-// INÍCIO DA FUNÇÃO handleCannonMovement (CORRIGIDA)
-// ===================================================================
 function handleCannonMovement(deltaTime) {
   const { isAiming } = getInputState();
   const keys = getMovementKeys();
@@ -147,16 +144,12 @@ function handleCannonMovement(deltaTime) {
       vz += rightDirection.z * speed;
     }
   } else {
-    // --- LÓGICA MODO TANQUE (SEM MIRA) ---
     const forwardDirection = new THREE.Vector3(0, 0, -1).applyQuaternion(
       gameCannon.basePivot.quaternion
     );
     forwardDirection.y = 0;
     forwardDirection.normalize();
 
-    // <<< CORREÇÃO DA LÓGICA INVERTIDA >>>
-    // Trocamos `+=` por `-=` e vice-versa para que o movimento corresponda à tecla pressionada.
-    // Isso alinha o controle à orientação do seu modelo 3D.
     if (keys.KeyW) {
       // Frente
       vx -= forwardDirection.x * speed;
@@ -172,7 +165,7 @@ function handleCannonMovement(deltaTime) {
       .crossVectors(forwardDirection, upVector)
       .normalize();
 
-    // <<< CORREÇÃO DA LÓGICA INVERTIDA (LATERAL) >>>
+    //
     if (keys.KeyA) {
       // Esquerda
       vx += rightDirection.x * speed;
@@ -188,9 +181,6 @@ function handleCannonMovement(deltaTime) {
   gameCannon.cannonBody.velocity.x = vx;
   gameCannon.cannonBody.velocity.z = vz;
 }
-// ===================================================================
-// FIM DA FUNÇÃO handleCannonMovement
-// ===================================================================
 
 function updateCamera() {
   const { isAiming, isOrbiting } = getInputState();

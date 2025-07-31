@@ -15,10 +15,6 @@ function getGroundHeight(x, z) {
   return intersects.length > 0 ? intersects[0].point.y : 0;
 }
 
-// ===================================================================
-// NOVA FUNÇÃO: CRIAR HITBOX PRECISA COM MALHA DE TRIÂNGULOS (Trimesh)
-// Perfeita para objetos irregulares como rochas e penhascos.
-// ===================================================================
 function createTrimeshHitbox(instance) {
   const meshes = [];
   instance.traverse((node) => {
@@ -52,10 +48,6 @@ function createTrimeshHitbox(instance) {
   });
 }
 
-// ===================================================================
-// FUNÇÃO ORIGINAL MODIFICADA PARA OBJETOS GENÉRICOS (Box Simples)
-// Usada para objetos simples como o acampamento, pontes, etc.
-// ===================================================================
 function placeStaticObject(modelKey, position, options = {}) {
   if (!_assetManager.models[modelKey]) return;
 
@@ -185,10 +177,6 @@ function createCentralPlateau() {
   );
 }
 
-// ===================================================================
-// NOVA FUNÇÃO: POSICIONAR ÁRVORES COM HITBOX COMPOSTA
-// Ótimo balanço entre precisão (tronco+copa) e performance.
-// ===================================================================
 function placeTreeWithCompoundHitbox(modelKey, position, options = {}) {
   if (!_assetManager.models[modelKey]) return;
 

@@ -37,7 +37,6 @@ export function initGameManager(dependencies) {
   _targetPhysicsMaterial = dependencies.targetPhysicsMaterial;
 }
 
-// <<< NOVO: NÍVEIS 3 E 4 ADICIONADOS COM ALVOS MÓVEIS >>>
 const levels = [
   {
     name: "Nível 1",
@@ -180,7 +179,6 @@ function onProjectileHit(event) {
   }
 }
 
-// <<< FUNÇÃO MODIFICADA PARA ACEITAR PADRÕES DE MOVIMENTO >>>
 function createTarget({ position, movementPattern = null }) {
   const model = assetManager.models.statueBlock.clone();
   model.traverse((n) => {
@@ -195,7 +193,6 @@ function createTarget({ position, movementPattern = null }) {
   const size = 1.8;
   const shape = new CANNON.Box(new CANNON.Vec3(size / 2, size / 2, size / 2));
 
-  // Se tem padrão de movimento, será um corpo KINEMATIC. Senão, DINÂMICO.
   const bodyOptions = {
     mass: movementPattern ? 0 : 10, // Corpos cinemáticos têm massa 0
     shape: shape,
@@ -253,7 +250,6 @@ function checkWinCondition() {
   }, 2000);
 }
 
-// <<< FUNÇÃO MODIFICADA PARA MOVER OS ALVOS >>>
 export function updateGameLogic() {
   // 1. Lógica de movimento para alvos cinemáticos
   const elapsedTime = _clock.getElapsedTime();
@@ -309,9 +305,8 @@ export function updateGameLogic() {
   }
 }
 
-// Exemplo de função de reinício
 export function restartGame() {
   gameState.score = 0;
-  // ...demais lógicas de reinício...
+
   updateGameUI(gameState);
 }
